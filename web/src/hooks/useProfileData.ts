@@ -1,0 +1,191 @@
+import { useState, useEffect, useCallback } from "react";
+
+export interface TileMeta {
+  [key: string]: unknown;
+}
+
+export interface Tile {
+  id: string;
+  order_index: number;
+  type: string;
+  title: string;
+  subtitle: string | null;
+  url: string | null;
+  col_span: number;
+  row_span: number;
+  meta: TileMeta | null;
+}
+
+export interface ProfileData {
+  id: string;
+  username: string;
+  display_name: string;
+  bio: string | null;
+  avatar_url: string | null;
+  theme: string;
+  tiles: Tile[];
+}
+
+interface UseProfileDataResult {
+  profile: ProfileData | null;
+  loading: boolean;
+  error: string | null;
+  refetch: () => void;
+}
+
+const API_BASE = import.meta.env.DEV ? "" : "";
+
+export function useProfileData(username: string | null): UseProfileDataResult {
+  const [profile, setProfile] = useState<ProfileData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchProfile = useCallback(async () => {
+    if (!username) {
+      setLoading(false);
+      setError("No username provided");
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const res = await fetch(`${API_BASE}/api/p/${encodeURIComponent(username)}`);
+
+      if (!res.ok) {
+        if (res.status === 404) {
+          setError("Profile not found");
+        } else {
+          setError(`Failed to load profile (${res.status})`);
+        }
+        setProfile(null);
+        return;
+      }
+
+      const data = await res.json();
+      setProfile(data);
+    } catch (err) {
+      setError("Could not connect to the server");
+      setProfile(null);
+    } finally {
+      setLoading(false);
+    }
+  }, [username]);
+
+  useEffect(() => {
+    fetchProfile();
+  }, [fetchProfile]);
+
+  return { profile, loading, error, refetch: fetchProfile };
+}
+
+// API helpers for mutations
+
+export async function updateProfile(
+  initData: string,
+  updates: Partial<Pick<ProfileData, "display_name" | "bio" | "avatar_url" | "theme">>
+): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_BASE}/api/profile`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `tma ${initData}`,
+      },
+      body: JSON.stringify(updates),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+export async function addTile(
+  initData: string,
+  tile: { type: string; title: string; subtitle?: string; url?: string; col_span?: number; row_span?: number; meta?: TileMeta }
+): Promise<string | null> {
+  try {
+    const res = await fetch(`${API_BASE}/api/tiles`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `tma ${initData}`,
+      },
+      body: JSON.stringify(tile),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return data.tile_id;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export async function removeTile(initData: string, tileId: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_BASE}/api/tiles/${tileId}`, {
+      method: "DELETE",
+      headers: { Authorization: `tma ${initData}` },
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+export async function reorderTiles(initData: string, tileIds: string[]): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_BASE}/api/tiles/reorder`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `tma ${initData}`,
+      },
+      body: JSON.stringify({ tile_ids: tileIds }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+export async function recordTileClick(tileId: string): Promise<void> {
+  try {
+    await fetch(`${API_BASE}/api/click/${tileId}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+    });
+  } catch {
+    // Non-critical
+  }
+}
+
+export interface AnalyticsData {
+  profile_views: number;
+  total_clicks: number;
+  tiles: {
+    tile_id: string;
+    title: string;
+    type: string;
+    clicks: number;
+    ctr: number;
+  }[];
+}
+
+export async function fetchAnalytics(initData: string): Promise<AnalyticsData | null> {
+  try {
+    const res = await fetch(`${API_BASE}/api/analytics`, {
+      headers: { Authorization: `tma ${initData}` },
+    });
+    if (res.ok) {
+      return await res.json();
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}

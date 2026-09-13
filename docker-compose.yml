@@ -1,0 +1,16 @@
+services:
+  biogram:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-mock_token}
+      - DEMO_MODE=true
+      - PORT=8080
+      - NODE_ENV=production
+    volumes:
+      - biogram_data:/data
+    restart: unless-stopped
+
+volumes:
+  biogram_data:
