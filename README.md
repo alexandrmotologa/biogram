@@ -6,7 +6,7 @@
 
 <p align="center">
   <b>Luxury Bento-grid personal link-in-bio inside Telegram.</b><br />
-  Showcase repositories, social channels, audio previews, secret content, and book calls without forcing your audience to leave Telegram.
+  Share GitHub repositories, social links, audio previews, gate private content, and schedule appointments directly within Telegram.
 </p>
 
 <p align="center">
@@ -18,7 +18,7 @@
 
 ---
 
-## Live Demo & Showcase
+## Live Demo & Interface Preview
 
 <p align="center">
   <img src="docs/images/demo.gif?raw=true" alt="BioGram Interactive Demo" width="380" style="border-radius: 20px; box-shadow: 0 20px 40px rgba(0,0,0,0.4);" />
