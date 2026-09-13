@@ -2,11 +2,14 @@ import { FastifyInstance } from "fastify";
 import { v4 as uuidv4 } from "uuid";
 import {
   getProfileByTelegramId,
+  getProfileById,
+  getTileById,
   recordClick,
   getClickStats,
   getProfileViewCount,
 } from "../db/database";
 import { extractTelegramUser } from "../security/auth";
+import { sendOwnerNotification } from "../bot/bot";
 
 // Simple in-memory rate limiter for click recording
 const clickCooldowns = new Map<string, number>();
@@ -39,6 +42,19 @@ export async function analyticsRoutes(app: FastifyInstance): Promise<void> {
 
     try {
       recordClick(uuidv4(), tileId);
+
+      // Notify profile owner in background if notifications are enabled
+      const tile = getTileById(tileId);
+      if (tile) {
+        const profile = getProfileById(tile.profile_id);
+        if (profile && profile.notifications_enabled && profile.telegram_user_id > 0) {
+          sendOwnerNotification(
+            profile.telegram_user_id,
+            `🔔 <b>New Click Alert!</b>\nA visitor just clicked on your Bento tile: <b>${tile.title}</b> (<i>${tile.type}</i>)`
+          ).catch(() => {});
+        }
+      }
+
       return { success: true };
     } catch {
       return reply.status(500).send({ error: "Failed to record click" });
@@ -60,8 +76,9 @@ export async function analyticsRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(404).send({ error: "Profile not found" });
     }
 
-    const clickStats = getClickStats(profile.id);
     const viewCount = getProfileViewCount(profile.id);
+    const clickStats = getClickStats(profile.id);
+
     const totalClicks = clickStats.reduce((sum, s) => sum + s.clicks, 0);
 
     return {

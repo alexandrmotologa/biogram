@@ -60,6 +60,10 @@ function initSchema(): void {
       bio TEXT,
       avatar_url TEXT,
       theme TEXT DEFAULT 'obsidian',
+      badges TEXT,
+      custom_bg TEXT,
+      glass_blur INTEGER DEFAULT 12,
+      notifications_enabled INTEGER DEFAULT 1,
       created_at INTEGER NOT NULL
     )
   `);
@@ -76,6 +80,8 @@ function initSchema(): void {
       col_span INTEGER DEFAULT 1,
       row_span INTEGER DEFAULT 1,
       meta_json TEXT,
+      locked_stars INTEGER DEFAULT 0,
+      unlocked_content TEXT,
       FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE
     )
   `);
@@ -95,6 +101,36 @@ function initSchema(): void {
       created_at INTEGER NOT NULL
     )
   `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS leads (
+      id TEXT PRIMARY KEY,
+      profile_id TEXT NOT NULL,
+      email_or_handle TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE
+    )
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS stars_transactions (
+      id TEXT PRIMARY KEY,
+      tile_id TEXT NOT NULL,
+      profile_id TEXT NOT NULL,
+      telegram_user_id INTEGER NOT NULL,
+      stars_amount INTEGER NOT NULL,
+      telegram_payment_charge_id TEXT,
+      created_at INTEGER NOT NULL
+    )
+  `);
+
+  // Migrations for existing databases
+  try { db.run("ALTER TABLE profiles ADD COLUMN badges TEXT"); } catch {}
+  try { db.run("ALTER TABLE profiles ADD COLUMN custom_bg TEXT"); } catch {}
+  try { db.run("ALTER TABLE profiles ADD COLUMN glass_blur INTEGER DEFAULT 12"); } catch {}
+  try { db.run("ALTER TABLE profiles ADD COLUMN notifications_enabled INTEGER DEFAULT 1"); } catch {}
+  try { db.run("ALTER TABLE bento_tiles ADD COLUMN locked_stars INTEGER DEFAULT 0"); } catch {}
+  try { db.run("ALTER TABLE bento_tiles ADD COLUMN unlocked_content TEXT"); } catch {}
 }
 
 // Profile operations
@@ -107,6 +143,10 @@ export interface Profile {
   bio: string | null;
   avatar_url: string | null;
   theme: string;
+  badges?: string[] | null;
+  custom_bg?: string | null;
+  glass_blur?: number;
+  notifications_enabled?: boolean;
   created_at: number;
 }
 
@@ -121,9 +161,35 @@ export interface BentoTile {
   col_span: number;
   row_span: number;
   meta_json: string | null;
+  locked_stars?: number;
+  unlocked_content?: string | null;
+}
+
+export interface Lead {
+  id: string;
+  profile_id: string;
+  email_or_handle: string;
+  created_at: number;
+}
+
+export interface StarsTransaction {
+  id: string;
+  tile_id: string;
+  profile_id: string;
+  telegram_user_id: number;
+  stars_amount: number;
+  telegram_payment_charge_id: string | null;
+  created_at: number;
 }
 
 function rowToProfile(row: unknown[]): Profile {
+  let badges: string[] | null = null;
+  if (row[7] && typeof row[7] === "string") {
+    try {
+      badges = JSON.parse(row[7]);
+    } catch {}
+  }
+
   return {
     id: row[0] as string,
     telegram_user_id: row[1] as number,
@@ -131,8 +197,12 @@ function rowToProfile(row: unknown[]): Profile {
     display_name: row[3] as string,
     bio: row[4] as string | null,
     avatar_url: row[5] as string | null,
-    theme: row[6] as string,
-    created_at: row[7] as number,
+    theme: (row[6] as string) || "obsidian",
+    badges,
+    custom_bg: row[8] as string | null,
+    glass_blur: typeof row[9] === "number" ? row[9] : 12,
+    notifications_enabled: row[10] === 1 || row[10] === null || row[10] === undefined,
+    created_at: row[11] as number,
   };
 }
 
@@ -148,12 +218,14 @@ function rowToTile(row: unknown[]): BentoTile {
     col_span: row[7] as number,
     row_span: row[8] as number,
     meta_json: row[9] as string | null,
+    locked_stars: typeof row[10] === "number" ? row[10] : 0,
+    unlocked_content: row[11] as string | null,
   };
 }
 
 export function getProfileByUsername(username: string): Profile | undefined {
   const d = getDb();
-  const stmt = d.prepare("SELECT * FROM profiles WHERE username = ?");
+  const stmt = d.prepare("SELECT id, telegram_user_id, username, display_name, bio, avatar_url, theme, badges, custom_bg, glass_blur, notifications_enabled, created_at FROM profiles WHERE username = ?");
   stmt.bind([username]);
   if (stmt.step()) {
     const row = stmt.get();
@@ -166,7 +238,7 @@ export function getProfileByUsername(username: string): Profile | undefined {
 
 export function getProfileByTelegramId(telegramUserId: number): Profile | undefined {
   const d = getDb();
-  const stmt = d.prepare("SELECT * FROM profiles WHERE telegram_user_id = ?");
+  const stmt = d.prepare("SELECT id, telegram_user_id, username, display_name, bio, avatar_url, theme, badges, custom_bg, glass_blur, notifications_enabled, created_at FROM profiles WHERE telegram_user_id = ?");
   stmt.bind([telegramUserId]);
   if (stmt.step()) {
     const row = stmt.get();
@@ -177,25 +249,77 @@ export function getProfileByTelegramId(telegramUserId: number): Profile | undefi
   return undefined;
 }
 
+export function getProfileById(profileId: string): Profile | undefined {
+  const d = getDb();
+  const stmt = d.prepare("SELECT id, telegram_user_id, username, display_name, bio, avatar_url, theme, badges, custom_bg, glass_blur, notifications_enabled, created_at FROM profiles WHERE id = ?");
+  stmt.bind([profileId]);
+  if (stmt.step()) {
+    const row = stmt.get();
+    stmt.free();
+    return rowToProfile(row);
+  }
+  stmt.free();
+  return undefined;
+}
+
+export function getPublicProfiles(): Profile[] {
+  const d = getDb();
+  const profiles: Profile[] = [];
+  const stmt = d.prepare("SELECT id, telegram_user_id, username, display_name, bio, avatar_url, theme, badges, custom_bg, glass_blur, notifications_enabled, created_at FROM profiles ORDER BY created_at DESC LIMIT 30");
+  while (stmt.step()) {
+    profiles.push(rowToProfile(stmt.get()));
+  }
+  stmt.free();
+  return profiles;
+}
+
 export function createProfile(profile: Profile): void {
   const d = getDb();
+  const badgesJson = profile.badges ? JSON.stringify(profile.badges) : null;
+  const notifVal = profile.notifications_enabled === false ? 0 : 1;
   d.run(
-    `INSERT INTO profiles (id, telegram_user_id, username, display_name, bio, avatar_url, theme, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [profile.id, profile.telegram_user_id, profile.username, profile.display_name, profile.bio, profile.avatar_url, profile.theme, profile.created_at]
+    `INSERT INTO profiles (id, telegram_user_id, username, display_name, bio, avatar_url, theme, badges, custom_bg, glass_blur, notifications_enabled, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      profile.id,
+      profile.telegram_user_id,
+      profile.username,
+      profile.display_name,
+      profile.bio,
+      profile.avatar_url,
+      profile.theme,
+      badgesJson,
+      profile.custom_bg || null,
+      profile.glass_blur ?? 12,
+      notifVal,
+      profile.created_at,
+    ]
   );
   saveDb();
 }
 
-export function updateProfile(profileId: string, updates: Partial<Pick<Profile, "display_name" | "bio" | "avatar_url" | "theme">>): void {
+export function updateProfile(
+  profileId: string,
+  updates: Partial<Pick<Profile, "display_name" | "bio" | "avatar_url" | "theme" | "badges" | "custom_bg" | "glass_blur" | "notifications_enabled">>
+): void {
   const d = getDb();
   const fields: string[] = [];
-  const values: (string | null)[] = [];
+  const values: (string | number | null)[] = [];
 
   if (updates.display_name !== undefined) { fields.push("display_name = ?"); values.push(updates.display_name); }
   if (updates.bio !== undefined) { fields.push("bio = ?"); values.push(updates.bio); }
   if (updates.avatar_url !== undefined) { fields.push("avatar_url = ?"); values.push(updates.avatar_url); }
   if (updates.theme !== undefined) { fields.push("theme = ?"); values.push(updates.theme); }
+  if (updates.badges !== undefined) {
+    fields.push("badges = ?");
+    values.push(updates.badges ? JSON.stringify(updates.badges) : null);
+  }
+  if (updates.custom_bg !== undefined) { fields.push("custom_bg = ?"); values.push(updates.custom_bg); }
+  if (updates.glass_blur !== undefined) { fields.push("glass_blur = ?"); values.push(updates.glass_blur); }
+  if (updates.notifications_enabled !== undefined) {
+    fields.push("notifications_enabled = ?");
+    values.push(updates.notifications_enabled ? 1 : 0);
+  }
 
   if (fields.length === 0) return;
 
@@ -209,7 +333,7 @@ export function updateProfile(profileId: string, updates: Partial<Pick<Profile, 
 export function getTilesByProfileId(profileId: string): BentoTile[] {
   const d = getDb();
   const tiles: BentoTile[] = [];
-  const stmt = d.prepare("SELECT * FROM bento_tiles WHERE profile_id = ? ORDER BY order_index ASC");
+  const stmt = d.prepare("SELECT id, profile_id, order_index, type, title, subtitle, url, col_span, row_span, meta_json, locked_stars, unlocked_content FROM bento_tiles WHERE profile_id = ? ORDER BY order_index ASC");
   stmt.bind([profileId]);
   while (stmt.step()) {
     tiles.push(rowToTile(stmt.get()));
@@ -218,12 +342,38 @@ export function getTilesByProfileId(profileId: string): BentoTile[] {
   return tiles;
 }
 
+export function getTileById(tileId: string): BentoTile | undefined {
+  const d = getDb();
+  const stmt = d.prepare("SELECT id, profile_id, order_index, type, title, subtitle, url, col_span, row_span, meta_json, locked_stars, unlocked_content FROM bento_tiles WHERE id = ?");
+  stmt.bind([tileId]);
+  if (stmt.step()) {
+    const tile = rowToTile(stmt.get());
+    stmt.free();
+    return tile;
+  }
+  stmt.free();
+  return undefined;
+}
+
 export function createTile(tile: BentoTile): void {
   const d = getDb();
   d.run(
-    `INSERT INTO bento_tiles (id, profile_id, order_index, type, title, subtitle, url, col_span, row_span, meta_json)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [tile.id, tile.profile_id, tile.order_index, tile.type, tile.title, tile.subtitle, tile.url, tile.col_span, tile.row_span, tile.meta_json]
+    `INSERT INTO bento_tiles (id, profile_id, order_index, type, title, subtitle, url, col_span, row_span, meta_json, locked_stars, unlocked_content)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      tile.id,
+      tile.profile_id,
+      tile.order_index,
+      tile.type,
+      tile.title,
+      tile.subtitle,
+      tile.url,
+      tile.col_span,
+      tile.row_span,
+      tile.meta_json,
+      tile.locked_stars ?? 0,
+      tile.unlocked_content || null,
+    ]
   );
   saveDb();
 }
@@ -305,6 +455,73 @@ export function getProfileViewCount(profileId: string): number {
   }
   stmt.free();
   return 0;
+}
+
+// Leads / Subscribers
+
+export function addLead(lead: Lead): void {
+  const d = getDb();
+  d.run(
+    "INSERT INTO leads (id, profile_id, email_or_handle, created_at) VALUES (?, ?, ?, ?)",
+    [lead.id, lead.profile_id, lead.email_or_handle, lead.created_at]
+  );
+  saveDb();
+}
+
+export function getLeads(profileId: string): Lead[] {
+  const d = getDb();
+  const list: Lead[] = [];
+  const stmt = d.prepare("SELECT id, profile_id, email_or_handle, created_at FROM leads WHERE profile_id = ? ORDER BY created_at DESC");
+  stmt.bind([profileId]);
+  while (stmt.step()) {
+    const row = stmt.get();
+    list.push({
+      id: row[0] as string,
+      profile_id: row[1] as string,
+      email_or_handle: row[2] as string,
+      created_at: row[3] as number,
+    });
+  }
+  stmt.free();
+  return list;
+}
+
+// Telegram Stars transactions
+
+export function recordStarsPayment(tx: StarsTransaction): void {
+  const d = getDb();
+  d.run(
+    "INSERT INTO stars_transactions (id, tile_id, profile_id, telegram_user_id, stars_amount, telegram_payment_charge_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+    [tx.id, tx.tile_id, tx.profile_id, tx.telegram_user_id, tx.stars_amount, tx.telegram_payment_charge_id, tx.created_at]
+  );
+  saveDb();
+}
+
+export function hasUserUnlockedTile(tileId: string, telegramUserId: number): boolean {
+  if (!telegramUserId) return false;
+  const d = getDb();
+  const stmt = d.prepare("SELECT COUNT(*) FROM stars_transactions WHERE tile_id = ? AND telegram_user_id = ?");
+  stmt.bind([tileId, telegramUserId]);
+  if (stmt.step()) {
+    const count = stmt.get()[0] as number;
+    stmt.free();
+    return count > 0;
+  }
+  stmt.free();
+  return false;
+}
+
+export function getUnlockedTileIdsForUser(profileId: string, telegramUserId: number): string[] {
+  if (!telegramUserId) return [];
+  const d = getDb();
+  const ids: string[] = [];
+  const stmt = d.prepare("SELECT tile_id FROM stars_transactions WHERE profile_id = ? AND telegram_user_id = ?");
+  stmt.bind([profileId, telegramUserId]);
+  while (stmt.step()) {
+    ids.push(stmt.get()[0] as string);
+  }
+  stmt.free();
+  return ids;
 }
 
 export function closeDb(): void {

@@ -7,6 +7,7 @@ import {
   updateProfile,
   getTilesByProfileId,
   recordProfileView,
+  hasUserUnlockedTile,
 } from "../db/database";
 import { extractTelegramUser } from "../security/auth";
 
@@ -23,6 +24,9 @@ export async function profileRoutes(app: FastifyInstance): Promise<void> {
     }
 
     const tiles = getTilesByProfileId(profile.id);
+    const user = extractTelegramUser(request.headers.authorization, botToken);
+    const requesterTelegramId = user?.id || 0;
+    const isOwner = requesterTelegramId > 0 && requesterTelegramId === profile.telegram_user_id;
 
     // Record a view (fire and forget, don't slow down the response)
     try {
@@ -38,17 +42,29 @@ export async function profileRoutes(app: FastifyInstance): Promise<void> {
       bio: profile.bio,
       avatar_url: profile.avatar_url,
       theme: profile.theme,
-      tiles: tiles.map((t) => ({
-        id: t.id,
-        order_index: t.order_index,
-        type: t.type,
-        title: t.title,
-        subtitle: t.subtitle,
-        url: t.url,
-        col_span: t.col_span,
-        row_span: t.row_span,
-        meta: t.meta_json ? JSON.parse(t.meta_json) : null,
-      })),
+      badges: profile.badges || [],
+      custom_bg: profile.custom_bg || null,
+      glass_blur: profile.glass_blur ?? 12,
+      notifications_enabled: profile.notifications_enabled !== false,
+      tiles: tiles.map((t) => {
+        const isGated = (t.locked_stars || 0) > 0;
+        const isUnlocked = !isGated || isOwner || hasUserUnlockedTile(t.id, requesterTelegramId);
+
+        return {
+          id: t.id,
+          order_index: t.order_index,
+          type: t.type,
+          title: t.title,
+          subtitle: t.subtitle,
+          url: t.url,
+          col_span: t.col_span,
+          row_span: t.row_span,
+          meta: t.meta_json ? JSON.parse(t.meta_json) : null,
+          locked_stars: t.locked_stars || 0,
+          is_unlocked: isUnlocked,
+          unlocked_content: isUnlocked ? t.unlocked_content : null,
+        };
+      }),
     };
   });
 
@@ -73,9 +89,13 @@ export async function profileRoutes(app: FastifyInstance): Promise<void> {
       bio?: string;
       avatar_url?: string;
       theme?: string;
+      badges?: string[];
+      custom_bg?: string | null;
+      glass_blur?: number;
+      notifications_enabled?: boolean;
     };
 
-    const validThemes = ["obsidian", "cyberpunk", "glassmorphic", "paper"];
+    const validThemes = ["obsidian", "cyberpunk", "tokyo", "aurora", "glassmorphic", "paper"];
     if (body.theme && !validThemes.includes(body.theme)) {
       return reply.status(400).send({ error: `Invalid theme. Choose from: ${validThemes.join(", ")}` });
     }
@@ -85,6 +105,10 @@ export async function profileRoutes(app: FastifyInstance): Promise<void> {
       bio: body.bio,
       avatar_url: body.avatar_url,
       theme: body.theme,
+      badges: body.badges,
+      custom_bg: body.custom_bg,
+      glass_blur: body.glass_blur,
+      notifications_enabled: body.notifications_enabled,
     });
 
     return { success: true };
@@ -110,6 +134,8 @@ export async function profileRoutes(app: FastifyInstance): Promise<void> {
       display_name: string;
       bio?: string;
       avatar_url?: string;
+      badges?: string[];
+      custom_bg?: string;
     };
 
     if (!body.username || !body.display_name) {
@@ -131,6 +157,10 @@ export async function profileRoutes(app: FastifyInstance): Promise<void> {
       bio: body.bio || null,
       avatar_url: body.avatar_url || null,
       theme: "obsidian",
+      badges: body.badges || [],
+      custom_bg: body.custom_bg || null,
+      glass_blur: 12,
+      notifications_enabled: true,
       created_at: Math.floor(Date.now() / 1000),
     });
 

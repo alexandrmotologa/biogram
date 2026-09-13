@@ -10,6 +10,9 @@ import { seedDemoProfile } from "./db/seeder";
 import { profileRoutes } from "./routes/profileApi";
 import { tilesRoutes } from "./routes/tilesApi";
 import { analyticsRoutes } from "./routes/analyticsApi";
+import { starsRoutes } from "./routes/starsApi";
+import { leadsRoutes } from "./routes/leadsApi";
+import { exploreRoutes } from "./routes/exploreApi";
 import { createBot, startPolling, stopBot } from "./bot/bot";
 
 const PORT = parseInt(process.env.PORT || "8080", 10);
@@ -62,6 +65,9 @@ async function main() {
   await app.register(profileRoutes);
   await app.register(tilesRoutes);
   await app.register(analyticsRoutes);
+  await app.register(starsRoutes);
+  await app.register(leadsRoutes);
+  await app.register(exploreRoutes);
 
   // Serve frontend static files
   const webDistPath = path.join(__dirname, "..", "..", "web", "dist");

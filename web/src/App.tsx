@@ -96,7 +96,13 @@ export default function App() {
         <EditBentoView profile={profile} onRefresh={refetch} onBack={handleSwitchToView} />
       ) : (
         <div>
-          <PublicBentoView profile={profile} />
+          <PublicBentoView
+            profile={profile}
+            onNavigateUser={(u) => {
+              setUsername(u);
+              setMode("view");
+            }}
+          />
           {/* Quick edit button (visible only for authenticated owners in a real scenario) */}
           <div className="text-center pb-4">
             <button

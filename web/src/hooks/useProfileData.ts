@@ -14,6 +14,9 @@ export interface Tile {
   col_span: number;
   row_span: number;
   meta: TileMeta | null;
+  locked_stars?: number;
+  is_unlocked?: boolean;
+  unlocked_content?: string | null;
 }
 
 export interface ProfileData {
@@ -23,7 +26,23 @@ export interface ProfileData {
   bio: string | null;
   avatar_url: string | null;
   theme: string;
+  badges?: string[];
+  custom_bg?: string | null;
+  glass_blur?: number;
+  notifications_enabled?: boolean;
   tiles: Tile[];
+}
+
+export interface ExploreProfile {
+  id: string;
+  username: string;
+  display_name: string;
+  bio: string | null;
+  avatar_url: string | null;
+  theme: string;
+  badges: string[];
+  tiles_count: number;
+  preview_tiles: { title: string; type: string }[];
 }
 
 interface UseProfileDataResult {
@@ -31,9 +50,10 @@ interface UseProfileDataResult {
   loading: boolean;
   error: string | null;
   refetch: () => void;
+  setProfileLocally: React.Dispatch<React.SetStateAction<ProfileData | null>>;
 }
 
-const API_BASE = import.meta.env.DEV ? "" : "";
+const API_BASE = "";
 
 export function useProfileData(username: string | null): UseProfileDataResult {
   const [profile, setProfile] = useState<ProfileData | null>(null);
@@ -65,7 +85,7 @@ export function useProfileData(username: string | null): UseProfileDataResult {
 
       const data = await res.json();
       setProfile(data);
-    } catch (err) {
+    } catch {
       setError("Could not connect to the server");
       setProfile(null);
     } finally {
@@ -77,14 +97,14 @@ export function useProfileData(username: string | null): UseProfileDataResult {
     fetchProfile();
   }, [fetchProfile]);
 
-  return { profile, loading, error, refetch: fetchProfile };
+  return { profile, loading, error, refetch: fetchProfile, setProfileLocally: setProfile };
 }
 
 // API helpers for mutations
 
 export async function updateProfile(
   initData: string,
-  updates: Partial<Pick<ProfileData, "display_name" | "bio" | "avatar_url" | "theme">>
+  updates: Partial<Pick<ProfileData, "display_name" | "bio" | "avatar_url" | "theme" | "badges" | "custom_bg" | "glass_blur" | "notifications_enabled">>
 ): Promise<boolean> {
   try {
     const res = await fetch(`${API_BASE}/api/profile`, {
@@ -103,7 +123,17 @@ export async function updateProfile(
 
 export async function addTile(
   initData: string,
-  tile: { type: string; title: string; subtitle?: string; url?: string; col_span?: number; row_span?: number; meta?: TileMeta }
+  tile: {
+    type: string;
+    title: string;
+    subtitle?: string;
+    url?: string;
+    col_span?: number;
+    row_span?: number;
+    meta?: TileMeta;
+    locked_stars?: number;
+    unlocked_content?: string;
+  }
 ): Promise<string | null> {
   try {
     const res = await fetch(`${API_BASE}/api/tiles`, {
@@ -161,6 +191,83 @@ export async function recordTileClick(tileId: string): Promise<void> {
     });
   } catch {
     // Non-critical
+  }
+}
+
+export async function subscribeNewsletter(username: string, emailOrHandle: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_BASE}/api/p/${encodeURIComponent(username)}/subscribe`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ emailOrHandle }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+export async function fetchExploreProfiles(): Promise<ExploreProfile[]> {
+  try {
+    const res = await fetch(`${API_BASE}/api/explore`);
+    if (res.ok) {
+      const data = await res.json();
+      return data.profiles || [];
+    }
+    return [];
+  } catch {
+    return [];
+  }
+}
+
+export interface StarsInvoiceResponse {
+  invoiceLink: string | null;
+  simulated: boolean;
+  tileId?: string;
+  price?: number;
+  title?: string;
+}
+
+export async function createStarsInvoice(
+  initData: string,
+  tileId: string,
+  amountStars?: number
+): Promise<StarsInvoiceResponse | null> {
+  try {
+    const res = await fetch(`${API_BASE}/api/stars/create-invoice`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `tma ${initData}`,
+      },
+      body: JSON.stringify({ tileId, amountStars }),
+    });
+    if (res.ok) {
+      return await res.json();
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export async function simulateUnlockTile(initData: string, tileId: string): Promise<string | null> {
+  try {
+    const res = await fetch(`${API_BASE}/api/stars/simulate-unlock`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `tma ${initData}`,
+      },
+      body: JSON.stringify({ tileId }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return data.unlocked_content;
+    }
+    return null;
+  } catch {
+    return null;
   }
 }
 

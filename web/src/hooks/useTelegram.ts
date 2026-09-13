@@ -61,6 +61,10 @@ interface TelegramWebApp {
     isActive: boolean;
     setParams: (params: Record<string, unknown>) => void;
   };
+  openLink: (url: string, options?: { try_instant_view?: boolean }) => void;
+  openTelegramLink: (url: string) => void;
+  openInvoice?: (url: string, callback?: (status: "paid" | "cancelled" | "failed" | "pending") => void) => void;
+  shareToStory?: (media_url: string, params?: { text?: string; widget_link?: { url: string; name?: string } }) => void;
 }
 
 export function useTelegram() {
@@ -111,6 +115,34 @@ export function useTelegram() {
     return webApp.current?.initDataUnsafe?.start_param;
   }, []);
 
+  const openInvoice = useCallback(
+    (url: string): Promise<"paid" | "cancelled" | "failed" | "pending"> => {
+      return new Promise((resolve) => {
+        if (webApp.current?.openInvoice) {
+          webApp.current.openInvoice(url, (status) => {
+            resolve(status);
+          });
+        } else {
+          // Fallback if not in Telegram or old client
+          window.open(url, "_blank");
+          resolve("pending");
+        }
+      });
+    },
+    []
+  );
+
+  const shareToStory = useCallback(
+    (mediaUrl: string, params?: { text?: string; widget_link?: { url: string; name?: string } }) => {
+      if (webApp.current?.shareToStory) {
+        webApp.current.shareToStory(mediaUrl, params);
+        return true;
+      }
+      return false;
+    },
+    []
+  );
+
   const isTelegram = Boolean(window.Telegram?.WebApp?.initData);
 
   return {
@@ -121,7 +153,10 @@ export function useTelegram() {
     getInitData,
     getUser,
     getStartParam,
+    openInvoice,
+    shareToStory,
     isTelegram,
     colorScheme: webApp.current?.colorScheme || "dark",
+    themeParams: webApp.current?.themeParams,
   };
 }

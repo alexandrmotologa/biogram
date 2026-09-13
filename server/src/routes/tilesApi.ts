@@ -35,9 +35,24 @@ export async function tilesRoutes(app: FastifyInstance): Promise<void> {
       col_span?: number;
       row_span?: number;
       meta?: Record<string, unknown>;
+      locked_stars?: number;
+      unlocked_content?: string;
     };
 
-    const validTypes = ["GITHUB", "SOCIAL", "TIP", "MEDIA", "TEXT", "CONTACT"];
+    const validTypes = [
+      "GITHUB",
+      "SOCIAL",
+      "TIP",
+      "MEDIA",
+      "TEXT",
+      "CONTACT",
+      "TELEGRAM_CHANNEL",
+      "AUDIO",
+      "GATED_STAR",
+      "NEWSLETTER",
+      "BOOKING",
+    ];
+
     if (!body.type || !validTypes.includes(body.type)) {
       return reply.status(400).send({ error: `Invalid type. Choose from: ${validTypes.join(", ")}` });
     }
@@ -59,9 +74,11 @@ export async function tilesRoutes(app: FastifyInstance): Promise<void> {
       title: body.title,
       subtitle: body.subtitle || null,
       url: body.url || null,
-      col_span: Math.min(body.col_span || 1, 2),
-      row_span: Math.min(body.row_span || 1, 2),
+      col_span: Math.min(Math.max(body.col_span || 1, 1), 2),
+      row_span: Math.min(Math.max(body.row_span || 1, 1), 2),
       meta_json: body.meta ? JSON.stringify(body.meta) : null,
+      locked_stars: body.locked_stars || 0,
+      unlocked_content: body.unlocked_content || null,
     });
 
     return reply.status(201).send({ success: true, tile_id: tileId });
