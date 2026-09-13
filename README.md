@@ -1,27 +1,92 @@
-# BioGram
+<p align="center">
+  <img src="docs/images/logo.png?raw=true" alt="BioGram Logo" width="130" style="border-radius: 24px;" />
+</p>
 
-Your Telegram profile page, done right. A personal link-in-bio that lives inside Telegram as a Mini App, so people find you where they already are.
+<h1 align="center">BioGram</h1>
 
-BioGram gives you a drag-and-drop grid of tiles: pin your GitHub repos, drop in social links, add a tip jar, embed a video, or put up a "message me" button. Pick a theme, share the link, and you're set.
+<p align="center">
+  <b>Luxury Bento-grid personal link-in-bio inside Telegram.</b><br />
+  Showcase repositories, social channels, audio previews, secret content, and book calls without forcing your audience to leave Telegram.
+</p>
 
-## What it looks like
+<p align="center">
+  <img src="https://img.shields.io/badge/Telegram-Mini%20App-26A5E4?logo=telegram&logoColor=white" alt="Telegram Mini App" />
+  <img src="https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black" alt="React 19" />
+  <img src="https://img.shields.io/badge/Fastify-5.x-000000?logo=fastify&logoColor=white" alt="Fastify" />
+  <img src="https://img.shields.io/badge/License-MIT-green.svg" alt="MIT License" />
+</p>
 
-> Screenshots coming once the frontend is wired up.
+---
+
+## Live Demo & Showcase
+
+<p align="center">
+  <img src="docs/images/demo.gif?raw=true" alt="BioGram Interactive Demo" width="380" style="border-radius: 20px; box-shadow: 0 20px 40px rgba(0,0,0,0.4);" />
+</p>
+
+### Real Interface Gallery
+
+<table align="center">
+  <tr>
+    <td align="center" width="50%">
+      <b>Public Bento Profile</b><br />
+      <img src="docs/images/screenshot-public.png?raw=true" alt="Public Bento Profile" width="320" style="border-radius: 14px;" />
+    </td>
+    <td align="center" width="50%">
+      <b>Telegram Stars Tipping & Gating</b><br />
+      <img src="docs/images/screenshot-stars.png?raw=true" alt="Telegram Stars Modal" width="320" style="border-radius: 14px;" />
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="50%">
+      <b>Explore Community Directory</b><br />
+      <img src="docs/images/screenshot-explore.png?raw=true" alt="Explore Community Directory" width="320" style="border-radius: 14px;" />
+    </td>
+    <td align="center" width="50%">
+      <b>Bento Grid Editor & Reordering</b><br />
+      <img src="docs/images/screenshot-edit.png?raw=true" alt="Bento Grid Editor" width="320" style="border-radius: 14px;" />
+    </td>
+  </tr>
+</table>
+
+---
 
 ## Why this exists
 
-Services like Linktree and Bento.me work fine, but they sit outside Telegram. If someone finds you through a Telegram group or channel, they shouldn't need to leave the app to see what you're about. BioGram keeps that entire flow inside Telegram's Mini App system.
+Services like Linktree and Bento.me work fine, but they sit outside Telegram. If someone discovers you through a Telegram channel, group, or discussion, clicking an external link breaks immersion and hurts conversions.
+
+BioGram keeps that entire experience native inside Telegram's Mini App ecosystem:
+- **Instant load** with zero redirects.
+- **Native Telegram Stars monetization** for tips and gated exclusive resources.
+- **Real-time bot alerts** delivered straight to your Telegram chat whenever someone taps key links or subscribes to your newsletter.
+
+---
 
 ## Features
 
-- **Bento grid layout** with 1x1, 2x1, and 2x2 tiles that snap into a responsive two-column grid
-- **Five tile types**: GitHub repo (live star count and language tag), social link, tip/coffee button, video embed, and direct Telegram contact
-- **Four themes**: Obsidian Dark, Cyberpunk, Glassmorphic, Minimal Paper
-- **Inline queries**: type `@biogram_bot username` in any chat to share a profile card
-- **Click analytics**: see which tiles people tap and how often
-- **Demo mode**: ships with a pre-seeded profile so you can see everything working without a bot token
-- **QR code generation**: get a scannable code for your profile link
-- **Data export**: download your profile as JSON
+- **Bento Grid Architecture**: Responsive 2-column grid with flexible tile dimensions (`1x1`, `2x1`, `1x2`, and `2x2`).
+- **Rich Tile Ecosystem**:
+  - 🐙 **GitHub Repos**: Live star counts and language tags.
+  - 📢 **Telegram Channel Widget**: Member count badge with direct "Join Channel" CTA.
+  - ⭐ **Gated Stars Tile**: Lock exclusive code, articles, or links behind Telegram Stars.
+  - ☕ **Tip Jar**: Receive Telegram Stars support directly with customizable star tiers.
+  - 🎵 **Mini Audio Player**: Preview audio tracks or voice intros with animated wave visualizer.
+  - 💌 **Newsletter / Lead Capture**: Collect emails or Telegram handles with instant creator alerts.
+  - 📅 **Booking & Appointments**: Direct scheduling links (Cal.com / Calendly) with live availability pills.
+  - 🔗 **Social Links, Video Embeds, Contact CTAs & Text Notes**.
+- **Four Luxury Themes**: Obsidian Dark, Cyberpunk, Tokyo Night, and Aurora, with glassmorphism cards and squircle borders.
+- **Telegram Bot Automation**:
+  - `/start`: Open or create your Bento profile card.
+  - `/notifications on|off`: Toggle real-time visitor click alerts.
+  - `/digest`: On-demand weekly performance report (views, clicks, CTR, top tiles).
+  - `/qr`: Generate a high-resolution QR code for your profile link.
+  - `/export`: Download your complete Bento setup as JSON.
+  - **Inline Queries**: Share your profile in any chat using `@biogram_bot <username>`.
+- **Explore Community**: In-app directory to browse and discover fellow creators.
+- **Dynamic OG Meta Tags**: Rich social previews when shared on Twitter/X, LinkedIn, or external browsers.
+- **Backup & Restore**: Export and import your Bento configuration as JSON directly in the editor.
+
+---
 
 ## Quick start
 
@@ -38,62 +103,74 @@ Open `http://localhost:8080` in your browser. The demo profile loads automatical
 
 ### Manual setup
 
-You'll need Node.js 20+ installed.
+You will need Node.js 20+ installed.
 
 ```bash
-# Install server dependencies
+# Install server dependencies and build
 cd server
 npm install
 npm run build
 
-# Install frontend dependencies
+# Install frontend dependencies and build
 cd ../web
 npm install
 npm run build
 
-# Go back to server and start
+# Start the BioGram server
 cd ../server
 npm start
 ```
 
+---
+
 ## Environment variables
 
-| Variable | Required | Default | What it does |
+| Variable | Required | Default | Description |
 |---|---|---|---|
 | `TELEGRAM_BOT_TOKEN` | Yes (unless DEMO_MODE) | — | Bot token from @BotFather |
-| `DEMO_MODE` | No | `false` | Seeds a sample profile on startup |
+| `DEMO_MODE` | No | `false` | Pre-seeds rich demo profile with 11 tiles |
 | `PORT` | No | `8080` | HTTP server port |
 | `NODE_ENV` | No | `development` | `development` or `production` |
 
+---
+
 ## Tech stack
 
-- **Backend**: Node.js, TypeScript, Fastify, grammY
-- **Database**: SQLite (better-sqlite3) in WAL mode
-- **Frontend**: React 19, Vite, Tailwind CSS, Lucide Icons
-- **Telegram SDK**: @twa-dev/sdk
-- **Containerization**: Docker with multi-stage builds
+- **Backend**: Node.js, TypeScript, Fastify, grammY (Telegram Bot Framework)
+- **Database**: SQLite (`sql.js` WASM / pure JS) with disk persistence in `data/biogram.db`
+- **Frontend**: React 19, TypeScript, Vite, Tailwind CSS, Lucide Icons
+- **Branding**: Procedural SVG and Resvg vector mascot design
+- **Containerization**: Multi-stage Dockerfile and Docker Compose
+
+---
 
 ## Project structure
 
 ```
 biogram/
-├── server/           # API + Telegram bot
+├── docs/
+│   ├── images/       # Official logo, screenshots, and animated demo GIF
+│   ├── ARCHITECTURE.md
+│   ├── CONTRIBUTING.md
+│   └── DEPLOYMENT.md
+├── server/           # Fastify API + grammY Telegram bot
 │   └── src/
-│       ├── bot/      # grammY bot, commands, inline queries
-│       ├── db/       # SQLite schema and demo seeder
-│       ├── routes/   # REST API endpoints
-│       └── security/ # Telegram auth validation
-├── web/              # React Mini App
+│       ├── bot/      # Bot commands, notifications, payments, inline queries
+│       ├── db/       # SQLite schema, migrations, seeder
+│       ├── routes/   # Profile, tiles, stars, leads, analytics, explore API
+│       └── security/ # Telegram HMAC-SHA256 initData validation
+├── web/              # React 19 Telegram Mini App
 │   └── src/
-│       ├── views/    # Public grid, editor, analytics
 │       ├── components/
-│       │   └── tiles/ # Individual tile types
-│       ├── hooks/    # Telegram SDK and data fetching
-│       └── styles/   # Tailwind config and theme CSS
-├── docs/             # Architecture, deployment, contributing
+│       │   └── tiles/ # Rich tile components (Channel, Audio, Gated, etc.)
+│       ├── views/    # PublicBentoView, EditBentoView, ExploreModal, Analytics
+│       ├── hooks/    # Telegram SDK & data fetching
+│       └── styles/   # Tailwind and custom theme styles
 ├── Dockerfile
 └── docker-compose.yml
 ```
+
+---
 
 ## Contributing
 
